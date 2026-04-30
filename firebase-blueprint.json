@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile identifying application settings and state.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The user's email."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["FREE", "PREMIUM"],
+          "description": "Their membership plan level."
+        },
+        "stripeCustomerId": {
+            "type": "string",
+            "description": "Stripe ID for linking webhooks."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Registration date."
+        }
+      },
+      "required": ["email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Profiles for registered users."
+    }
+  }
+}

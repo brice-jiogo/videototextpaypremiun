@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    // Primitive definition
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { 
+      return request.resource.data; 
+    }
+    function existing() { 
+      return resource.data; 
+    }
+    function isSignedIn() { 
+      return request.auth != null; 
+    }
+
+    // User Profile Blueprint
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt'])
+        && data.email is string
+        && data.email.size() <= 200
+        && data.role in ['FREE', 'PREMIUM']
+        && (!('stripeCustomerId' in data) || (data.stripeCustomerId is string && data.stripeCustomerId.size() <= 200));
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      // We allow a user to create their own profile, MUST be FREE tier initially
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId
+        && isValidUser(incoming())
+        && incoming().role == 'FREE';
+
+      // Users can't change their own roles or ID, they can only update stripeCustomerId or role via cloud function
+      allow update: if isSignedIn() && isValidId(userId) && request.auth.uid == userId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'stripeCustomerId']); 
+
+      allow delete: if false;
+    }
+  }
+}
