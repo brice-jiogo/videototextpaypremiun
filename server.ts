@@ -638,6 +638,25 @@ async function startServer() {
     }
   });
 
+  // Mark the signed-in user's email as verified via Firebase Admin (useful for sites that
+  // want to bypass email verification for onboarding). Requires Firebase Admin credentials.
+  app.post('/api/mark-email-verified', requireFirebaseUser, async (req, res) => {
+    try {
+      const uid = res.locals.firebaseUser.uid as string;
+      try {
+        await getAuth().updateUser(uid, { emailVerified: true });
+        res.json({ success: true });
+      } catch (adminErr: any) {
+        // If admin SDK is not configured or update fails, log and return an informative error
+        console.warn('Failed to mark emailVerified via Admin SDK', adminErr.message || adminErr);
+        return res.status(500).json({ error: 'Failed to mark email verified on server. Check Firebase Admin credentials.' });
+      }
+    } catch (err: any) {
+      console.error('/api/mark-email-verified failed', err);
+      res.status(500).json({ error: err.message || 'Failed to mark email verified' });
+    }
+  });
+
   app.post("/api/sync-checkout-session", requireFirebaseUser, async (req, res) => {
     try {
       const uid = res.locals.firebaseUser.uid as string;

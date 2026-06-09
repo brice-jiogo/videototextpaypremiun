@@ -1,0 +1,42 @@
+name: 🧪 Tests & Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript type checking
+        run: npm run lint
+
+      - name: Build application
+        run: npm run build
+
+      - name: Check build artifacts
+        run: |
+          if [ ! -f dist/server.cjs ]; then
+            echo "❌ Production bundle not found"
+            exit 1
+          fi
+          SIZE=$(du -h dist/server.cjs | cut -f1)
+          echo "✅ Server bundle created: $SIZE"

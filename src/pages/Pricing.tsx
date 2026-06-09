@@ -1,33 +1,31 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { loadStripe } from '@stripe/stripe-js';
 import { motion } from 'motion/react';
-import { Check, Zap, ArrowRight, Calendar, Clock } from 'lucide-react';
+import { Check, Zap, ArrowRight, Calendar, Clock, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../lib/utils';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_51LxR9sA8GFmNq8FQqh6UiQKB9aYs0wxOhAnNAOLSgn4IYgI6o3pRTWmQMFeb44ypfMs1F32P7Pcg1oSJtTsaqDFt00uDygs1R0');
+import { apiFetch } from '../lib/api';
 
 const plans = [
     {
-        id: 'price_monthly',
+        id: 'monthly',
         name: 'Monthly',
         price: '$9.99',
         interval: '/month',
-        features: ['7-day free trial', 'Zero Ads', 'Premium Features', 'Priority Support']
+        features: ['Billed monthly', 'Zero Ads', 'Premium Features', 'Priority Support']
     },
     {
-        id: 'price_yearly',
+        id: 'yearly',
         name: 'Yearly',
-        price: '$79.99',
+        price: '$69.99',
         interval: '/year',
-        features: ['7-day free trial', '2 months free', 'Zero Ads', 'Premium Features'],
+        features: ['Save 42% vs monthly', 'Zero Ads', 'Premium Features', 'Priority Support'],
         popular: true
     },
     {
-        id: 'price_lifetime',
+        id: 'lifetime',
         name: 'Lifetime',
-        price: '$199.99',
+        price: '$129.99',
         interval: ' once',
         features: ['Pay once, enjoy forever', 'Zero Ads', 'Premium Features', 'Instant access']
     }
@@ -40,54 +38,44 @@ export default function Pricing() {
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
 
   const premiumStatus = userData?.premiumStatus || 'FREE';
-  const isPremiumTrial = premiumStatus === 'PREMIUM_TRIAL';
 
-  const handleSubscribe = async (priceId: string) => {
+  const handleSubscribe = async (planId: string) => {
     if (!user) {
         navigate('/login');
         return;
     }
 
-    if (userData?.premiumStatus === 'PREMIUM' || userData?.premiumStatus === 'PREMIUM_TRIAL') {
-        alert("You are already on the PREMIUM tier!");
+    if (userData?.premiumStatus === 'PREMIUM' || userData?.premiumStatus === 'PREMIUM_TRIAL' || userData?.premiumStatus === 'CANCELING') {
+        alert("You are already on a premium plan! Visit your dashboard to manage your subscription.");
         return;
     }
 
-    setLoading(priceId);
+    setLoading(planId);
     
     try {
-        const response = await fetch('/api/create-checkout-session', {
+        const token = await user.getIdToken(true);
+        const res = await apiFetch('/api/create-checkout-session', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-                priceId,
-                userId: user.uid
-            }),
+            body: JSON.stringify({ planId }),
         });
-        
-        const session = await response.json();
-        
-        if (session.error) {
-            throw new Error(session.error);
+
+        if (!res.ok) {
+            const message = res.json?.error || res.json?.raw || `Request failed (${res.status})`;
+            throw new Error(String(message));
         }
 
-        if (session.id === 'mock') {
-            alert('Stripe key not configured. Mocking success checkout.');
-            window.location.href = session.url;
-            return;
-        }
+        const session = res.json || {};
+        if (session.error) throw new Error(session.error || 'Failed to create checkout session');
 
         if (session.url) {
-            // Open Stripe Checkout in a new tab to avoid iframe restrictions
             const newWindow = window.open(session.url, '_blank');
-            if (!newWindow) {
-                // Fallback if popup blocked
-                setCheckoutUrl(session.url);
-            }
+            if (!newWindow) setCheckoutUrl(session.url);
         } else {
-            throw new Error("No checkout URL returned from server.");
+            throw new Error('No checkout URL returned from server. Ensure the backend is deployed and VITE_API_BASE_URL is configured.');
         }
     } catch (err: any) {
         console.error(err);
@@ -138,10 +126,12 @@ export default function Pricing() {
               <Zap className="w-5 h-5 text-green-400" />
               <div className="text-center">
                 <p className="text-green-400 font-semibold">
-                  {premiumStatus === 'PREMIUM_TRIAL' ? 'Trial Active' : 'Premium Active'}
+                  {premiumStatus === 'CANCELING' ? 'Premium Active Until Period End' : 'Premium Active'}
                 </p>
                 <p className="text-green-300 text-sm">
-                  {daysRemaining} days remaining • Expires {formatDate(userData?.premiumEndDate)}
+                  {userData?.isLifetime
+                    ? 'Lifetime access'
+                    : `${daysRemaining} days remaining • Next renewal ${formatDate(userData?.nextRenewalDate || userData?.premiumEndDate)}`}
                 </p>
               </div>
               <button 
@@ -153,7 +143,11 @@ export default function Pricing() {
             </motion.div>
           )}
 
-          <p className="text-lg text-zinc-400">Pick the best plan for you. All recurring plans include a 7-day free trial.</p>
+          <p className="text-lg text-zinc-400">Pick the best plan for you. No hidden fees — charged immediately upon purchase.</p>
+          <div className="mt-6 inline-flex max-w-2xl items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-left text-sm text-amber-100">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-amber-400" />
+            <span>Your PREMIUM subscription will take effect when you sign in to the mobile app with this same email address.</span>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -161,7 +155,7 @@ export default function Pricing() {
                 <div 
                     key={plan.id}
                     className={`relative p-8 rounded-2xl border ${plan.popular ? 'border-amber-500/50 shadow-2xl shadow-amber-500/10 relative z-10 scale-105 bg-gradient-to-b from-[#0C0C0E] to-[#120f09]' : 'border-white/5 bg-[#0C0C0E]'} flex flex-col ${
-                      isPremium && userData?.subscriptionType === plan.id.replace('price_', '') ? 'border-green-500/50' : ''
+                      isPremium && userData?.subscriptionType === plan.id ? 'border-green-500/50' : ''
                     }`}
                 >
                     {plan.popular && (
@@ -172,7 +166,7 @@ export default function Pricing() {
                     )}
                     
                     {/* Current Plan Badge */}
-                    {isPremium && userData?.subscriptionType === plan.id.replace('price_', '') && (
+                    {isPremium && userData?.subscriptionType === plan.id && (
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-500 text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                             <Check className="w-3 h-3" />
                             <span>Current Plan</span>
@@ -186,16 +180,16 @@ export default function Pricing() {
                     </div>
 
                     {/* Current Plan Info */}
-                    {isPremium && userData?.subscriptionType === plan.id.replace('price_', '') && (
+                    {isPremium && userData?.subscriptionType === plan.id && (
                         <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                             <div className="flex items-center gap-2 text-green-400 text-sm mb-1">
                                 <Calendar className="w-4 h-4" />
-                                <span>Current period ends {formatDate(userData?.premiumEndDate)}</span>
+                                <span>{userData?.isLifetime ? 'Lifetime access active' : `Current period ends ${formatDate(userData?.premiumEndDate)}`}</span>
                             </div>
-                            {premiumStatus === 'PREMIUM_TRIAL' && (
+                            {premiumStatus === 'CANCELING' && (
                                 <div className="flex items-center gap-2 text-amber-400 text-sm">
                                     <Clock className="w-4 h-4" />
-                                    <span>{daysRemaining} days left in trial</span>
+                                    <span>Auto-renewal is stopped</span>
                                 </div>
                             )}
                         </div>
@@ -212,9 +206,9 @@ export default function Pricing() {
 
                     <button 
                         onClick={() => handleSubscribe(plan.id)}
-                        disabled={loading === plan.id || (isPremium && userData?.subscriptionType === plan.id.replace('price_', ''))}
+                        disabled={loading === plan.id || (isPremium && userData?.subscriptionType === plan.id)}
                         className={`w-full py-3 rounded-lg font-bold text-sm transition-all ${
-                          isPremium && userData?.subscriptionType === plan.id.replace('price_', '')
+                          isPremium && userData?.subscriptionType === plan.id
                             ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
                             : plan.popular 
                               ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20'
@@ -222,7 +216,7 @@ export default function Pricing() {
                         } disabled:opacity-50`}
                     >
                         {loading === plan.id ? 'Loading...' : (
-                          isPremium && userData?.subscriptionType === plan.id.replace('price_', '')
+                          isPremium && userData?.subscriptionType === plan.id
                             ? 'Current Plan'
                             : 'Get Started'
                         )}

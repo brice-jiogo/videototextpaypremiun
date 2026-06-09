@@ -1,7 +1,7 @@
 # Plan: Système d'authentification et de paiement premium fonctionnel
 
 ## TL;DR
-Implémenter un système complet d'authentification (Sign In/Sign Up), de gestion des abonnements premium avec trois tiers tarifaires en USD ($9,99/mois, $79,99/an, $199,99 à vie), vérification du statut premium avec dates d'expiration, essai gratuit de 7 jours, et reçus par email. Le système utilisera Stripe pour les paiements et Firestore pour la gestion des données utilisateur.
+Implémenter un système complet d'authentification (Sign In/Sign Up), de gestion des abonnements premium avec trois tiers tarifaires en USD ($9,99/mois, $69,99/an, $129,99 à vie), vérification du statut premium avec dates d'expiration, essai gratuit de 7 jours, et reçus par email. Le système utilisera Stripe pour les paiements et Firestore pour la gestion des données utilisateur.
 
 ## Architecture globale
 - **Frontend**: React avec React Router pour la navigation, pages d'authentification, pricing, dashboard
@@ -18,8 +18,8 @@ Implémenter un système complet d'authentification (Sign In/Sign Up), de gestio
 
 1. Mettre à jour [Pricing.tsx](src/pages/Pricing.tsx) avec les tarifs USD:
    - Monthly: $9.99
-   - Yearly: $79.99  
-   - Lifetime: $199.99
+   - Yearly: $69.99  
+   - Lifetime: $129.99
 
 2. Modifier le schéma utilisateur Firestore pour inclure:
    - `premiumStatus`: 'FREE' | 'PREMIUM_TRIAL' | 'PREMIUM'
@@ -32,7 +32,7 @@ Implémenter un système complet d'authentification (Sign In/Sign Up), de gestio
 
 3. Mettre à jour [server.ts](server.ts) - endpoint `/api/create-checkout-session`:
    - Changer devise de 'eur' à 'usd'
-   - Mettre à jour unit_amount: 999, 7999, 19999 (cents)
+   - Mettre à jour unit_amount: 999, 6999, 12999 (cents)
    - S'assurer que subscription_data ajoute trial_period_days: 7 pour Monthly et Yearly
 
 4. Créer/mettre à jour la fonction `syncUserDocument` dans [firebase.ts](src/lib/firebase.ts) pour initialiser le schéma utilisateur avec les champs premium

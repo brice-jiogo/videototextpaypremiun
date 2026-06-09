@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 // Premium status utilities
 export function isPremiumActive(premiumStatus: string | null | undefined, premiumEndDate: any): boolean {
   if (!premiumStatus || premiumStatus === 'FREE') return false;
-  if (premiumStatus === 'PREMIUM' || premiumStatus === 'PREMIUM_TRIAL') {
+  if (premiumStatus === 'PREMIUM' || premiumStatus === 'PREMIUM_TRIAL' || premiumStatus === 'CANCELING') {
     if (!premiumEndDate) return true; // Lifetime
     const endDate = premiumEndDate.toDate?.() || new Date(premiumEndDate);
     return endDate > new Date();
@@ -44,8 +44,24 @@ export function getDaysRemainingInSubscription(premiumEndDate: any): number {
 
 export function formatDate(date: any): string {
   if (!date) return 'N/A';
-  const d = date.toDate?.() || new Date(date);
-  return d instanceof Date ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+  let d: Date | null = null;
+  // Firestore Timestamp instance (client SDK)
+  if (typeof date?.toDate === 'function') {
+    d = date.toDate();
+  // Firestore Timestamp serialized to JSON by the server: {_seconds, _nanoseconds}
+  } else if (date?._seconds !== undefined) {
+    d = new Date(date._seconds * 1000);
+  // Firestore Timestamp serialized as {seconds, nanoseconds} (admin SDK)
+  } else if (date?.seconds !== undefined) {
+    d = new Date(date.seconds * 1000);
+  // Plain Unix timestamp (number in milliseconds)
+  } else if (typeof date === 'number') {
+    d = new Date(date);
+  } else {
+    d = new Date(date);
+  }
+  if (!d || isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function formatCurrency(amount: number, currency: string = 'USD'): string {
@@ -92,12 +108,12 @@ export function calculateCorrectPremiumStatus(premiumStatus: string | null | und
     return 'PREMIUM_TRIAL';
   }
   
-  if (premiumStatus === 'PREMIUM') {
+  if (premiumStatus === 'PREMIUM' || premiumStatus === 'CANCELING') {
     if (!premiumEndDate) return 'PREMIUM'; // Lifetime
     if (hasSubscriptionExpired(premiumEndDate)) {
       return 'FREE'; // Subscription expired
     }
-    return 'PREMIUM';
+    return premiumStatus;
   }
   
   return 'FREE';
@@ -105,21 +121,21 @@ export function calculateCorrectPremiumStatus(premiumStatus: string | null | und
 
 // Check premium status and return corrected status with all relevant data
 export function checkPremiumStatus(userData: any): {
-  status: string;
+  premiumStatus: string;
   isPremiumActive: boolean;
   premiumExpiresAt: any;
   daysRemainingInTrial: number;
   daysRemainingInSubscription: number;
 } {
-  const premiumStatus = userData?.premiumStatus || 'FREE';
+  const originalStatus = userData?.premiumStatus || 'FREE';
   const premiumStartDate = userData?.premiumStartDate;
   const premiumEndDate = userData?.premiumEndDate;
   
-  const correctedStatus = calculateCorrectPremiumStatus(premiumStatus, premiumStartDate, premiumEndDate);
+  const correctedStatus = calculateCorrectPremiumStatus(originalStatus, premiumStartDate, premiumEndDate);
   const isActive = isPremiumActive(correctedStatus, premiumEndDate);
   
   return {
-    status: correctedStatus,
+    premiumStatus: correctedStatus,
     isPremiumActive: isActive,
     premiumExpiresAt: premiumEndDate,
     daysRemainingInTrial: getDaysRemainingInTrial(correctedStatus, premiumStartDate, premiumEndDate),

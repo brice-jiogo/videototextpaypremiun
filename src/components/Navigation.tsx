@@ -6,11 +6,9 @@ import { LogOut, Zap, Menu, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Navigation() {
-  const { user, userData, isPremium, daysRemaining } = useAuth();
+  const { user, userData, isPremium, daysRemaining, isTrialActive, daysRemainingInTrial, premiumStatus } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
-
-  const premiumStatus = userData?.premiumStatus || 'FREE';
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -35,15 +33,15 @@ export default function Navigation() {
         {user ? (
           <>
             {/* Status Badge */}
-            {premiumStatus === 'PREMIUM_TRIAL' ? (
+            {isTrialActive ? (
               <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-500">
                 <Zap className="w-3 h-3" />
-                <span>Trial ({daysRemaining}d)</span>
+                <span>Trial ({daysRemainingInTrial}d left)</span>
               </div>
-            ) : premiumStatus === 'PREMIUM' ? (
+            ) : premiumStatus === 'PREMIUM' || premiumStatus === 'CANCELING' ? (
               <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-green-500">
                 <Zap className="w-3 h-3" />
-                <span>Premium ({daysRemaining}d)</span>
+                <span>{premiumStatus === 'CANCELING' ? 'Ending' : 'Premium'} ({userData?.isLifetime ? 'Life' : `${daysRemaining}d`})</span>
               </div>
             ) : (
               <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-white">

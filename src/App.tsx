@@ -9,6 +9,7 @@ import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toast } from './components/Toast';
+import GoogleTranslate from './components/GoogleTranslate';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Pricing from './pages/Pricing';
@@ -37,6 +38,7 @@ export default function App() {
               />
             </Routes>
           </main>
+          <GoogleTranslate />
           <Toast />
         </div>
       </Router>
