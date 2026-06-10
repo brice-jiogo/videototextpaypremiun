@@ -252,10 +252,10 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Yearly</h3>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-extrabold text-white">$79.99</span>
+                <span className="text-4xl font-extrabold text-white">$69.99</span>
                 <span className="text-zinc-400">/year</span>
               </div>
-              <p className="text-sm text-amber-500 font-semibold mb-6">Save 33% vs monthly</p>
+              <p className="text-sm text-amber-500 font-semibold mb-6">Save 42% vs monthly</p>
               <p className="text-sm text-zinc-400 mb-6">7-day free trial included</p>
               <ul className="space-y-3 flex-1">
                 <li className="flex items-center gap-2 text-zinc-300">
@@ -289,7 +289,7 @@ export default function Landing() {
             >
               <h3 className="text-xl font-bold text-white mb-2">Lifetime</h3>
               <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-extrabold text-white">$199.99</span>
+                <span className="text-4xl font-extrabold text-white">$129.99</span>
                 <span className="text-zinc-400">once</span>
               </div>
               <p className="text-sm text-zinc-400 mb-6">One-time payment, forever access</p>

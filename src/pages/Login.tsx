@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { auth } from '../lib/firebase';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
-import { Eye, EyeOff, Mail, CheckCircle } from 'lucide-react';
+import { signInWithPopup, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { Eye, EyeOff } from 'lucide-react';
 import { showToast } from '../components/Toast';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -17,8 +16,6 @@ export default function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
 
   // Validate email format
   const isValidEmail = (email: string) => {
@@ -38,11 +35,24 @@ export default function Login() {
       setLoading(true);
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (popupErr: any) {
+        // If popup blocked, attempt redirect fallback
+        if (popupErr?.code === 'auth/popup-blocked' || popupErr?.code === 'auth/cancelled-popup-request') {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
       showToast('Welcome! Signed in successfully', 'success');
       navigate('/dashboard');
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
+      // Provide clearer guidance for unauthorized domain in production
+      if (err?.code === 'auth/unauthorized-domain') {
+        setError('Google sign-in blocked: your production domain is not authorized in Firebase Auth. Add your domain (e.g. videototextservices.vercel.app) to Authorized domains in the Firebase Console.');
+        showToast('Google sign-in blocked: unauthorized domain. Check Firebase Console.', 'error');
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         setError(err.message || 'Google sign-in failed');
       }
     } finally {
@@ -50,35 +60,9 @@ export default function Login() {
     }
   };
 
-  const handleSendVerificationEmail = async (user: any) => {
-    try {
-      await sendEmailVerification(user, {
-        url: `${window.location.origin}/login`,
-        handleCodeInApp: false,
-      });
-      return true;
-    } catch (err: any) {
-      console.error('Failed to send verification email:', err);
-      return false;
-    }
-  };
-
-  const handleResendVerification = async () => {
-    if (!auth.currentUser) return;
-    
-    setResendLoading(true);
-    const success = await handleSendVerificationEmail(auth.currentUser);
-    
-    if (success) {
-      showToast('Verification email sent! Please check your inbox.', 'success');
-    }
-    setResendLoading(false);
-  };
-
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setVerificationSent(false);
 
     // Validation
     if (!isValidEmail(email)) {
@@ -99,42 +83,37 @@ export default function Login() {
     
     try {
       if (isLogin) {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        
-        // Check if email is verified
-        if (!userCredential.user.emailVerified) {
-          setError('Please verify your email address before signing in. Check your inbox or request a new verification email.');
-          setVerificationSent(true);
-          setLoading(false);
-          return;
-        }
-        
+        await signInWithEmailAndPassword(auth, email, password);
         showToast('Welcome back! Signed in successfully', 'success');
         navigate('/dashboard');
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        
-        // Send verification email
-        const sent = await handleSendVerificationEmail(userCredential.user);
-        
-        if (sent) {
-          showToast('Account created! A verification email has been sent to your inbox.', 'success');
-          setVerificationSent(true);
-        } else {
-          showToast('Account created! Please verify your email to continue.', 'warning');
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        showToast('Account created successfully! Welcome aboard.', 'success');
+
+        // Attempt to mark email as verified on the server using Firebase Admin
+        try {
+          const token = await cred.user.getIdToken(true);
+          await fetch('/api/mark-email-verified', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+        } catch (markErr) {
+          console.warn('Could not mark email verified on server:', markErr);
         }
-        
-        // Don't navigate to dashboard until email is verified
+
+        navigate('/dashboard');
       }
     } catch (err: any) {
       const errorMap: { [key: string]: string } = {
         'auth/operation-not-allowed': 'Email/Password auth is not enabled. Please contact support.',
         'auth/user-not-found': 'No account found with this email address.',
         'auth/wrong-password': 'Incorrect password. Please try again.',
+        'auth/invalid-credential': 'Incorrect email or password. Please try again.',
         'auth/email-already-in-use': 'This email is already registered. Please sign in instead.',
         'auth/weak-password': 'Password is too weak. Please use a stronger password.',
         'auth/invalid-email': 'Invalid email address.',
         'auth/user-disabled': 'This account has been disabled.',
+        'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
       };
       
       setError(errorMap[err.code] || err.message || 'Authentication failed');
@@ -218,39 +197,6 @@ export default function Login() {
     );
   }
 
-  if (verificationSent) {
-    return (
-      <div className="flex items-center justify-center flex-1 bg-[#09090B] px-4 py-8">
-        <div className="w-full max-w-md bg-[#0C0C0E] p-8 rounded-2xl border border-white/10 shadow-2xl text-center">
-          <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-8 h-8 text-amber-500" />
-          </div>
-          <h2 className="text-2xl font-semibold text-white mb-2">Check Your Email</h2>
-          <p className="text-zinc-400 mb-8">
-            We've sent a verification link to<br />
-            <span className="text-amber-500">{email}</span>
-          </p>
-          <p className="text-sm text-zinc-500 mb-8">
-            Please verify your email address to access your account.
-          </p>
-          <button
-            onClick={handleResendVerification}
-            disabled={resendLoading}
-            className="w-full bg-zinc-900 border border-white/10 text-white font-semibold py-3 px-4 rounded-lg text-sm hover:bg-zinc-800 transition-colors mb-4"
-          >
-            {resendLoading ? 'Sending...' : 'Resend Verification Email'}
-          </button>
-          <button
-            onClick={() => { setIsLogin(true); setVerificationSent(false); setError(null); }}
-            className="w-full bg-amber-500 text-black font-bold py-3 px-4 rounded-lg text-sm hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20"
-          >
-            Back to Sign In
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-center justify-center flex-1 bg-[#09090B] px-4 py-8">
       <div className="w-full max-w-md bg-[#0C0C0E] p-8 rounded-2xl border border-white/10 shadow-2xl">
@@ -258,7 +204,7 @@ export default function Login() {
           {isLogin ? 'Welcome Back' : 'Create an Account'}
         </h2>
         <p className="text-center text-zinc-400 text-sm mb-8">
-          {isLogin ? 'Sign in to manage your PREMIUM account.' : 'Sign up to start your 7-day free trial.'}
+          {isLogin ? 'Sign in to manage your PREMIUM account.' : 'Sign up and get instant access to Premium.'}
         </p>
         
         {error && (
@@ -289,7 +235,7 @@ export default function Login() {
                   onClick={() => setShowForgotPassword(true)}
                   className="text-xs text-amber-500 hover:text-amber-400 font-semibold transition-colors"
                 >
-                  Forgot?
+                  Forgot password?
                 </button>
               )}
             </div>
@@ -347,7 +293,7 @@ export default function Login() {
         <p className="mt-6 text-center text-sm text-zinc-400">
           {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
           <button 
-            onClick={() => { setIsLogin(!isLogin); setError(null); setVerificationSent(false); }}
+            onClick={() => { setIsLogin(!isLogin); setError(null); }}
             className="text-amber-500 hover:text-amber-400 font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer"
             type="button"
           >

@@ -1,5 +1,13 @@
 // Email template for payment receipts
-export function generateReceiptEmail(userName, amount, currency, invoiceUrl, subscriptionType, startDate, endDate) {
+export function generateReceiptEmail(
+  userName: string,
+  amount: number,
+  currency: string,
+  invoiceUrl: string | null,
+  subscriptionType: string,
+  startDate: string | Date,
+  endDate: string | Date
+) {
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD',

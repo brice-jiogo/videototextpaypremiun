@@ -21,13 +21,38 @@ service cloud.firestore {
       return request.auth != null; 
     }
 
-    // User Profile Blueprint
+    // User Profile Blueprint. Payment fields are written only by the trusted server/Admin SDK.
     function isValidUser(data) {
-      return data.keys().hasAll(['email', 'role', 'createdAt'])
+      return data.keys().hasAll(['email', 'uid', 'premiumStatus', 'createdAt'])
         && data.email is string
         && data.email.size() <= 200
-        && data.role in ['FREE', 'PREMIUM']
-        && (!('stripeCustomerId' in data) || (data.stripeCustomerId is string && data.stripeCustomerId.size() <= 200));
+        && data.uid is string
+        && data.premiumStatus in ['FREE', 'PREMIUM', 'PREMIUM_TRIAL', 'CANCELING', 'PAST_DUE']
+        && (!('stripeCustomerId' in data) || data.stripeCustomerId == null || (data.stripeCustomerId is string && data.stripeCustomerId.size() <= 200))
+        && (!('stripeSubscriptionId' in data) || data.stripeSubscriptionId == null || (data.stripeSubscriptionId is string && data.stripeSubscriptionId.size() <= 200));
+    }
+
+    function protectedBillingFields() {
+      return [
+        'premiumStatus',
+        'premiumActivationMessage',
+        'premiumStartDate',
+        'premiumEndDate',
+        'nextRenewalDate',
+        'subscriptionType',
+        'subscriptionCancelAtPeriodEnd',
+        'subscriptionCanceledAt',
+        'billingInterval',
+        'isLifetime',
+        'stripeCustomerId',
+        'stripeSubscriptionId',
+        'stripeLastCheckoutSessionId',
+        'lastPaymentDate',
+        'lastPaymentAmount',
+        'lastPaymentCurrency',
+        'lastReceiptUrl',
+        'lastInvoiceUrl'
+      ];
     }
 
     // Users Collection
@@ -37,13 +62,20 @@ service cloud.firestore {
       // We allow a user to create their own profile, MUST be FREE tier initially
       allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId
         && isValidUser(incoming())
-        && incoming().role == 'FREE';
+        && incoming().premiumStatus == 'FREE'
+        && (!('stripeCustomerId' in incoming()) || incoming().stripeCustomerId == null)
+        && (!('stripeSubscriptionId' in incoming()) || incoming().stripeSubscriptionId == null);
 
-      // Users can't change their own roles or ID, they can only update stripeCustomerId or role via cloud function
+      // Users may edit only non-billing profile data. Billing status is server-owned.
       allow update: if isSignedIn() && isValidId(userId) && request.auth.uid == userId
-        && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'stripeCustomerId']); 
+        && !incoming().diff(existing()).affectedKeys().hasAny(protectedBillingFields());
 
       allow delete: if false;
+
+      match /payments/{paymentId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow write: if false;
+      }
     }
   }
 }
