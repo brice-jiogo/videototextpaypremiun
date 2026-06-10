@@ -23,8 +23,12 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies (build native from source)
+        env:
+          npm_config_build_from_source: 'true'
+        run: |
+          rm -rf node_modules package-lock.json || true
+          npm install
 
       - name: TypeScript type checking
         run: npm run lint
