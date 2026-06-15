@@ -52,6 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.json({ url: session.url, id: session.id });
   } catch (err: any) {
     console.error('create-checkout-session failed', err?.message || err);
+    console.error(err?.stack || err);
     res.status(500).json({ error: err?.message || 'Server error' });
   }
 }

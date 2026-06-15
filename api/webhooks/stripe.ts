@@ -211,6 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.json({ received: true });
   } catch (err: any) {
     console.error('Stripe webhook processing failed', err?.message || err);
+    console.error(err?.stack || err);
     // Return 200 to avoid Stripe retries when admin is unavailable, but indicate processingError
     return res.status(200).json({ received: true, processingError: true });
   }
