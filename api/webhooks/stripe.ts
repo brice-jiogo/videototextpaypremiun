@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getStripe, PLAN_CONFIG } from '../_helpers';
+import { getStripe, PLAN_CONFIG, setCorsHeaders } from '../_helpers';
 import Stripe from 'stripe';
 import fs from 'fs';
 import { initializeApp, getApps, cert, type AppOptions } from 'firebase-admin/app';
@@ -101,10 +101,7 @@ async function writePremiumState(userId: string, updates: Record<string, unknown
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS preflight
-  const origin = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '*');
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Stripe-Signature');
+  setCorsHeaders(req, res, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');

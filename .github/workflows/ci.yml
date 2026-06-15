@@ -10,25 +10,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies (build native from source)
-        env:
-          npm_config_build_from_source: 'true'
-        run: |
-          rm -rf node_modules package-lock.json || true
-          npm install
+      - name: Install dependencies
+        run: npm ci --include=optional
 
       - name: TypeScript type checking
         run: npm run lint

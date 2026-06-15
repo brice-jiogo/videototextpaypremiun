@@ -1,9 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { setCorsHeaders } from './_helpers';
 
-export default function handler(_req: VercelRequest, res: VercelResponse) {
-  const origin = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '*');
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export default function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(req, res, 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   res.status(200).json({ status: 'ok' });
 }
