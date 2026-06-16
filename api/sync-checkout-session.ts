@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { buildPremiumStateFromCheckoutSession, setCorsHeaders, verifyFirebaseIdToken, writePremiumState } from './_helpers';
+import { buildPremiumStateFromCheckoutSession, setCorsHeaders, verifyFirebaseIdToken, writePremiumState } from './_helpers.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res, 'POST, OPTIONS');

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getStripe, verifyFirebaseIdToken, PLAN_CONFIG, getAppUrl, setCorsHeaders } from './_helpers';
+import { getStripe, verifyFirebaseIdToken, PLAN_CONFIG, getAppUrl, setCorsHeaders } from './_helpers.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res, 'POST, OPTIONS');

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getStripe, PLAN_CONFIG, setCorsHeaders } from '../_helpers';
+import { getStripe, PLAN_CONFIG, setCorsHeaders } from '../_helpers.js';
 import Stripe from 'stripe';
 import fs from 'fs';
 import { initializeApp, getApps, cert, type AppOptions } from 'firebase-admin/app';

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { buildPremiumStateFromCheckoutSession, getStripe, setCorsHeaders, verifyFirebaseIdToken, writePremiumState } from './_helpers';
+import { buildPremiumStateFromCheckoutSession, getStripe, setCorsHeaders, verifyFirebaseIdToken, writePremiumState } from './_helpers.js';
 
 function escapeStripeSearchValue(value: string) {
   return value.replace(/'/g, "\\'");
